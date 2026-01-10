@@ -1,14 +1,27 @@
 """
-Content Router - Personalization and Translation endpoints
+Content Router - Personalization, Translation, and RAG Ingestion endpoints
 """
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import Optional
+from typing import Optional, List, Dict
 import os
 from openai import OpenAI
 
 router = APIRouter()
+
+# Import RAG service and textbook content
+from services.rag_service import RAGService
+from data.textbook_content import CHAPTERS
+
+# Lazy initialization for RAG service
+_rag_service = None
+
+def get_rag_service():
+    global _rag_service
+    if _rag_service is None:
+        _rag_service = RAGService()
+    return _rag_service
 
 # Lazy initialization for OpenAI client
 _openai_client = None
@@ -203,3 +216,44 @@ async def get_chapters():
             }
         ]
     }
+
+
+@router.post("/ingest")
+async def ingest_textbook_content():
+    """
+    Ingest all textbook content into Qdrant for RAG.
+    This populates the vector database with chapter content.
+    """
+    try:
+        rag_service = get_rag_service()
+
+        # Ingest the chapters
+        count = rag_service.ingest_content(CHAPTERS)
+
+        return {
+            "status": "success",
+            "message": f"Ingested {count} textbook chunks into Qdrant",
+            "chunks_ingested": count
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/rag-status")
+async def get_rag_status():
+    """
+    Get the status of the RAG vector database.
+    """
+    try:
+        rag_service = get_rag_service()
+        info = rag_service.get_collection_info()
+
+        return {
+            "status": "connected",
+            "collection": info
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "error": str(e)
+        }

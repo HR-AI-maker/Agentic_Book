@@ -9,3 +9,4 @@ sqlalchemy==2.0.35
 python-multipart==0.0.9
 pydantic-settings==2.5.2
 pydantic[email]==2.9.2
+fastembed==0.3.6
