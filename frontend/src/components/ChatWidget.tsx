@@ -1,0 +1,217 @@
+"use client";
+
+import { useState, useRef, useEffect } from "react";
+import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+
+interface Message {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  sources?: Array<{
+    chapter: string;
+    title: string;
+    relevance: number;
+  }>;
+}
+
+export function ChatWidget() {
+  const [isOpen, setIsOpen] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: "welcome",
+      role: "assistant",
+      content:
+        "Hi! I'm your Physical AI textbook assistant. Ask me any questions about ROS 2, Gazebo, NVIDIA Isaac, or humanoid robotics. You can also select text on the page and ask questions about it!",
+    },
+  ]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [selectedText, setSelectedText] = useState("");
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // Listen for text selection
+  useEffect(() => {
+    const handleSelection = () => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().trim().length > 0) {
+        setSelectedText(selection.toString().trim());
+      }
+    };
+
+    document.addEventListener("mouseup", handleSelection);
+    return () => document.removeEventListener("mouseup", handleSelection);
+  }, []);
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+
+    const userMessage: Message = {
+      id: Date.now().toString(),
+      role: "user",
+      content: input + (selectedText ? `\n\n[Selected text: "${selectedText.slice(0, 200)}..."]` : ""),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+    setInput("");
+    setIsLoading(true);
+
+    try {
+      const response = await fetch(
+        process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/chat",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            question: input,
+            context: selectedText || undefined,
+          }),
+        }
+      );
+
+      if (!response.ok) throw new Error("Failed to get response");
+
+      const data = await response.json();
+
+      const assistantMessage: Message = {
+        id: data.message_id,
+        role: "assistant",
+        content: data.answer,
+        sources: data.sources,
+      };
+
+      setMessages((prev) => [...prev, assistantMessage]);
+      setSelectedText("");
+    } catch {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: Date.now().toString(),
+          role: "assistant",
+          content:
+            "Sorry, I encountered an error. Please make sure the API server is running and try again.",
+        },
+      ]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <>
+      {/* Chat Button */}
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="fixed bottom-6 right-6 z-50 bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-lg transition-all duration-200 hover:scale-105"
+        aria-label={isOpen ? "Close chat" : "Open chat"}
+      >
+        {isOpen ? <X className="w-6 h-6" /> : <MessageCircle className="w-6 h-6" />}
+      </button>
+
+      {/* Selected Text Indicator */}
+      {selectedText && !isOpen && (
+        <div className="fixed bottom-24 right-6 z-40 bg-yellow-100 border border-yellow-400 text-yellow-800 px-4 py-2 rounded-lg shadow-md max-w-xs">
+          <p className="text-sm font-medium">Text selected!</p>
+          <p className="text-xs truncate">&quot;{selectedText.slice(0, 50)}...&quot;</p>
+          <button
+            onClick={() => setIsOpen(true)}
+            className="text-xs text-blue-600 hover:underline mt-1"
+          >
+            Ask about this
+          </button>
+        </div>
+      )}
+
+      {/* Chat Panel */}
+      {isOpen && (
+        <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200">
+          {/* Header */}
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-t-2xl">
+            <h3 className="font-semibold">Physical AI Assistant</h3>
+            <p className="text-xs text-blue-100">Ask questions about the textbook</p>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-4 space-y-4">
+            {messages.map((message) => (
+              <div
+                key={message.id}
+                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+              >
+                <div
+                  className={`max-w-[80%] px-4 py-2 rounded-2xl ${
+                    message.role === "user"
+                      ? "bg-blue-600 text-white rounded-br-md"
+                      : "bg-gray-100 text-gray-800 rounded-bl-md"
+                  }`}
+                >
+                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+                  {message.sources && message.sources.length > 0 && (
+                    <div className="mt-2 pt-2 border-t border-gray-300">
+                      <p className="text-xs font-medium mb-1">Sources:</p>
+                      {message.sources.map((source, idx) => (
+                        <p key={idx} className="text-xs text-gray-600">
+                          Ch. {source.chapter}: {source.title}
+                        </p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+            {isLoading && (
+              <div className="flex justify-start">
+                <div className="bg-gray-100 px-4 py-2 rounded-2xl rounded-bl-md">
+                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* Selected Text Indicator in Chat */}
+          {selectedText && (
+            <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200">
+              <p className="text-xs text-yellow-800">
+                <span className="font-medium">Context: </span>
+                &quot;{selectedText.slice(0, 100)}...&quot;
+                <button
+                  onClick={() => setSelectedText("")}
+                  className="ml-2 text-yellow-600 hover:underline"
+                >
+                  Clear
+                </button>
+              </p>
+            </div>
+          )}
+
+          {/* Input */}
+          <div className="p-4 border-t border-gray-200">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                placeholder="Ask a question..."
+                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                disabled={isLoading}
+              />
+              <button
+                onClick={sendMessage}
+                disabled={isLoading || !input.trim()}
+                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-2 rounded-full transition-colors"
+              >
+                <Send className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
