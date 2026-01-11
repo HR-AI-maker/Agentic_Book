@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2 } from "lucide-react";
+import { MessageCircle, X, Send, Loader2, Languages } from "lucide-react";
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
+  translatedContent?: string;
+  isTranslating?: boolean;
   sources?: Array<{
     chapter: string;
     title: string;
@@ -27,6 +29,7 @@ export function ChatWidget() {
   const [input, setInput] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [selectedText, setSelectedText] = useState("");
+  const [showUrdu, setShowUrdu] = useState<Record<string, boolean>>({});
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Scroll to bottom when messages change
@@ -46,6 +49,48 @@ export function ChatWidget() {
     document.addEventListener("mouseup", handleSelection);
     return () => document.removeEventListener("mouseup", handleSelection);
   }, []);
+
+  const translateMessage = async (messageId: string, text: string) => {
+    // Mark message as translating
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId ? { ...msg, isTranslating: true } : msg
+      )
+    );
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+      const response = await fetch(`${apiUrl}/api/content/translate/`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+
+      if (!response.ok) throw new Error("Translation failed");
+
+      const data = await response.json();
+
+      // Update message with translation
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId
+            ? { ...msg, translatedContent: data.translated_text, isTranslating: false }
+            : msg
+        )
+      );
+      setShowUrdu((prev) => ({ ...prev, [messageId]: true }));
+    } catch {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === messageId ? { ...msg, isTranslating: false } : msg
+        )
+      );
+    }
+  };
+
+  const toggleLanguage = (messageId: string) => {
+    setShowUrdu((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -131,9 +176,15 @@ export function ChatWidget() {
       {isOpen && (
         <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200">
           {/* Header */}
-          <div className="bg-blue-600 text-white px-4 py-3 rounded-t-2xl">
-            <h3 className="font-semibold">Physical AI Assistant</h3>
-            <p className="text-xs text-blue-100">Ask questions about the textbook</p>
+          <div className="bg-blue-600 text-white px-4 py-3 rounded-t-2xl flex justify-between items-center">
+            <div>
+              <h3 className="font-semibold">Physical AI Assistant</h3>
+              <p className="text-xs text-blue-100">Ask questions about the textbook</p>
+            </div>
+            <div className="flex items-center gap-1 bg-blue-500 px-2 py-1 rounded-lg">
+              <Languages className="w-4 h-4" />
+              <span className="text-xs">اردو</span>
+            </div>
           </div>
 
           {/* Messages */}
@@ -150,8 +201,48 @@ export function ChatWidget() {
                       : "bg-gray-100 text-gray-800 rounded-bl-md"
                   }`}
                 >
-                  <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                  {message.sources && message.sources.length > 0 && (
+                  {/* Message Content */}
+                  <p
+                    className={`text-sm whitespace-pre-wrap ${
+                      showUrdu[message.id] && message.translatedContent ? "text-right" : ""
+                    }`}
+                    dir={showUrdu[message.id] && message.translatedContent ? "rtl" : "ltr"}
+                  >
+                    {showUrdu[message.id] && message.translatedContent
+                      ? message.translatedContent
+                      : message.content}
+                  </p>
+
+                  {/* Translation Button for Assistant Messages */}
+                  {message.role === "assistant" && message.id !== "welcome" && (
+                    <div className="mt-2 pt-2 border-t border-gray-300">
+                      {message.isTranslating ? (
+                        <div className="flex items-center gap-1 text-xs text-gray-500">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          <span>Translating to Urdu...</span>
+                        </div>
+                      ) : message.translatedContent ? (
+                        <button
+                          onClick={() => toggleLanguage(message.id)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <Languages className="w-3 h-3" />
+                          {showUrdu[message.id] ? "Show English" : "اردو میں دیکھیں"}
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => translateMessage(message.id, message.content)}
+                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                        >
+                          <Languages className="w-3 h-3" />
+                          Translate to Urdu
+                        </button>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Sources */}
+                  {message.sources && message.sources.length > 0 && !showUrdu[message.id] && (
                     <div className="mt-2 pt-2 border-t border-gray-300">
                       <p className="text-xs font-medium mb-1">Sources:</p>
                       {message.sources.map((source, idx) => (

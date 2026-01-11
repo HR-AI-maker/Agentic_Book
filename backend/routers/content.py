@@ -1,15 +1,83 @@
 """
-Content Router - Chapters and content endpoints
+Content Router - Chapters, content, and translation endpoints
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
+import os
+from openai import OpenAI
 
 router = APIRouter()
 
 # Import textbook content
 from data.textbook_content import CHAPTERS
+
+# Lazy initialization for Groq client
+_groq_client = None
+
+def get_groq_client():
+    global _groq_client
+    if _groq_client is None:
+        api_key = os.getenv("GROQ_API_KEY")
+        if not api_key:
+            raise ValueError("GROQ_API_KEY environment variable is required")
+        _groq_client = OpenAI(
+            api_key=api_key,
+            base_url="https://api.groq.com/openai/v1"
+        )
+    return _groq_client
+
+
+class TranslateRequest(BaseModel):
+    text: str
+    target_language: str = "urdu"
+
+
+class TranslateResponse(BaseModel):
+    original_text: str
+    translated_text: str
+    target_language: str
+
+
+@router.post("/translate", response_model=TranslateResponse)
+async def translate_content(request: TranslateRequest):
+    """
+    Translate text to Urdu (or other languages).
+    Keeps technical terms in English for clarity.
+    """
+    try:
+        system_prompt = """You are an expert translator specializing in technical and educational content.
+Translate the following content to Urdu while:
+1. Keeping technical terms (like ROS 2, URDF, NVIDIA, Python, Gazebo, Isaac, LLM, API, etc.) in English
+2. Using proper Urdu script (نستعلیق)
+3. Keeping code blocks and commands exactly as they are
+4. Preserving the educational and clear tone
+5. Making the translation natural and easy to understand for Urdu speakers
+
+Only return the translated text, nothing else."""
+
+        user_prompt = f"Translate this to Urdu:\n\n{request.text}"
+
+        response = get_groq_client().chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=2000
+        )
+
+        translated = response.choices[0].message.content
+
+        return TranslateResponse(
+            original_text=request.text,
+            translated_text=translated,
+            target_language=request.target_language
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/chapters")
