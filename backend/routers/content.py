@@ -1,171 +1,15 @@
 """
-Content Router - Personalization, Translation, and RAG Ingestion endpoints
+Content Router - Chapters and content endpoints
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional, List, Dict
-import os
-from openai import OpenAI
+from typing import Optional, List
 
 router = APIRouter()
 
-# Import RAG service and textbook content
-from services.rag_service import RAGService
+# Import textbook content
 from data.textbook_content import CHAPTERS
-
-# Lazy initialization for RAG service
-_rag_service = None
-
-def get_rag_service():
-    global _rag_service
-    if _rag_service is None:
-        _rag_service = RAGService()
-    return _rag_service
-
-# Lazy initialization for OpenAI client
-_openai_client = None
-
-def get_openai_client():
-    global _openai_client
-    if _openai_client is None:
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
-            raise ValueError("OPENAI_API_KEY environment variable is required")
-        _openai_client = OpenAI(api_key=api_key)
-    return _openai_client
-
-
-class PersonalizeRequest(BaseModel):
-    content: str
-    chapter_id: str
-    user_level: str  # "beginner", "intermediate", "advanced"
-    user_background: Optional[str] = None
-
-
-class PersonalizeResponse(BaseModel):
-    original_chapter: str
-    personalized_content: str
-    adjustments_made: list[str]
-
-
-class TranslateRequest(BaseModel):
-    content: str
-    chapter_id: str
-    target_language: str = "urdu"
-
-
-class TranslateResponse(BaseModel):
-    original_chapter: str
-    translated_content: str
-    target_language: str
-
-
-@router.post("/personalize", response_model=PersonalizeResponse)
-async def personalize_content(request: PersonalizeRequest):
-    """
-    Personalize chapter content based on user's experience level.
-    - Beginners: More explanations, simpler code, additional context
-    - Intermediate: Standard content with some advanced tips
-    - Advanced: More technical depth, optimization tips
-    """
-    try:
-        system_prompt = f"""You are an expert technical writer adapting content for a {request.user_level} level student.
-
-For BEGINNER level:
-- Add more explanations for technical terms
-- Simplify code examples with more comments
-- Add analogies to everyday concepts
-- Break down complex steps into smaller pieces
-
-For INTERMEDIATE level:
-- Keep the content mostly as-is
-- Add occasional tips for best practices
-- Include brief mentions of advanced topics
-
-For ADVANCED level:
-- Add performance optimization tips
-- Include edge cases and advanced configurations
-- Reference deeper technical resources
-- Add architectural considerations"""
-
-        user_prompt = f"""Please adapt the following textbook content for a {request.user_level} level student:
-
-{request.content}
-
-User background: {request.user_background or 'Not specified'}
-
-Return the adapted content maintaining the same structure but adjusted for the user's level."""
-
-        response = get_openai_client().chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.5,
-            max_tokens=4000
-        )
-
-        personalized = response.choices[0].message.content
-
-        adjustments = []
-        if request.user_level == "beginner":
-            adjustments = ["Added more explanations", "Simplified code examples", "Added analogies"]
-        elif request.user_level == "intermediate":
-            adjustments = ["Added best practice tips", "Maintained technical depth"]
-        else:
-            adjustments = ["Added advanced optimizations", "Included edge cases", "Added architecture notes"]
-
-        return PersonalizeResponse(
-            original_chapter=request.chapter_id,
-            personalized_content=personalized,
-            adjustments_made=adjustments
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-@router.post("/translate", response_model=TranslateResponse)
-async def translate_content(request: TranslateRequest):
-    """
-    Translate chapter content to Urdu.
-    Maintains technical terms in English where appropriate.
-    """
-    try:
-        system_prompt = """You are an expert translator specializing in technical content.
-Translate the following content to Urdu while:
-1. Keeping technical terms (like ROS 2, URDF, NVIDIA, Python, etc.) in English
-2. Using proper Urdu script
-3. Maintaining code blocks exactly as they are
-4. Preserving the educational tone
-5. Using right-to-left formatting appropriate for Urdu"""
-
-        user_prompt = f"""Translate this textbook content to Urdu:
-
-{request.content}
-
-Remember to keep technical terms and code in English."""
-
-        response = get_openai_client().chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3,
-            max_tokens=4000
-        )
-
-        translated = response.choices[0].message.content
-
-        return TranslateResponse(
-            original_chapter=request.chapter_id,
-            translated_content=translated,
-            target_language=request.target_language
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/chapters")
@@ -218,42 +62,35 @@ async def get_chapters():
     }
 
 
-@router.post("/ingest")
-async def ingest_textbook_content():
+@router.get("/chapter/{chapter_id}")
+async def get_chapter(chapter_id: str):
     """
-    Ingest all textbook content into Qdrant for RAG.
-    This populates the vector database with chapter content.
+    Get content for a specific chapter.
     """
-    try:
-        rag_service = get_rag_service()
+    # Convert chapter_id format (e.g., "1-1" to "1.1")
+    normalized_id = chapter_id.replace("-", ".")
 
-        # Ingest the chapters
-        count = rag_service.ingest_content(CHAPTERS)
+    for chapter in CHAPTERS:
+        if chapter["chapter"] == normalized_id:
+            return {
+                "chapter": chapter["chapter"],
+                "title": chapter["title"],
+                "content": chapter["content"]
+            }
 
-        return {
-            "status": "success",
-            "message": f"Ingested {count} textbook chunks into Qdrant",
-            "chunks_ingested": count
-        }
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+    return {"error": "Chapter not found"}
 
 
-@router.get("/rag-status")
-async def get_rag_status():
+@router.get("/status")
+async def get_status():
     """
-    Get the status of the RAG vector database.
+    Get the status of the content service.
     """
-    try:
-        rag_service = get_rag_service()
-        info = rag_service.get_collection_info()
-
-        return {
-            "status": "connected",
-            "collection": info
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "error": str(e)
-        }
+    return {
+        "status": "ready",
+        "total_chapters": len(CHAPTERS),
+        "chapters": [
+            {"id": ch["chapter"], "title": ch["title"]}
+            for ch in CHAPTERS
+        ]
+    }
