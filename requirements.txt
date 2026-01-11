@@ -10,3 +10,5 @@ python-multipart==0.0.9
 pydantic-settings==2.5.2
 pydantic[email]==2.9.2
 fastembed==0.7.4
+pyjwt==2.8.0
+passlib[bcrypt]==1.7.4
