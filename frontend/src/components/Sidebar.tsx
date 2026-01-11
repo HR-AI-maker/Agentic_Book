@@ -18,6 +18,10 @@ interface Module {
   chapters: Chapter[];
 }
 
+interface SidebarProps {
+  onClose?: () => void;
+}
+
 const modules: Module[] = [
   {
     id: "module-1",
@@ -64,7 +68,7 @@ const modules: Module[] = [
   },
 ];
 
-export function Sidebar() {
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname();
   const [expandedModules, setExpandedModules] = useState<string[]>(["module-1"]);
 
@@ -76,14 +80,26 @@ export function Sidebar() {
     );
   };
 
+  const handleLinkClick = () => {
+    // Close sidebar on mobile when a link is clicked
+    if (onClose) {
+      onClose();
+    }
+  };
+
   return (
-    <aside className="w-72 bg-white border-r border-gray-200 h-screen overflow-y-auto fixed left-0 top-0 pt-16">
+    <aside
+      className="w-72 bg-white border-r border-gray-200 h-full overflow-y-auto pt-16"
+      role="navigation"
+      aria-label="Chapter navigation"
+    >
       <div className="p-4">
         <nav className="space-y-2">
           <Link
             href="/"
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg transition-colors ${
-              pathname === "/" ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50"
+            onClick={handleLinkClick}
+            className={`flex items-center gap-2 px-3 py-3 min-h-[44px] rounded-lg transition-colors ${
+              pathname === "/" ? "bg-blue-50 text-blue-700" : "hover:bg-gray-50 active:bg-gray-100"
             }`}
           >
             <Book className="w-5 h-5" />
@@ -99,7 +115,9 @@ export function Sidebar() {
               <div key={module.id} className="mb-1">
                 <button
                   onClick={() => toggleModule(module.id)}
-                  className="w-full flex items-center justify-between px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                  className="w-full flex items-center justify-between px-3 py-3 min-h-[44px] rounded-lg hover:bg-gray-50 active:bg-gray-100 transition-colors"
+                  aria-expanded={expandedModules.includes(module.id)}
+                  aria-controls={`${module.id}-chapters`}
                 >
                   <div className="flex items-center gap-2">
                     {module.icon}
@@ -113,7 +131,10 @@ export function Sidebar() {
                 </button>
 
                 {expandedModules.includes(module.id) && (
-                  <div className="ml-4 pl-4 border-l border-gray-200 mt-1 space-y-1">
+                  <div
+                    id={`${module.id}-chapters`}
+                    className="ml-4 pl-4 border-l border-gray-200 mt-1 space-y-1"
+                  >
                     {module.chapters.map((chapter) => {
                       const chapterPath = `/chapters/${chapter.slug}`;
                       const isActive = pathname === chapterPath;
@@ -122,10 +143,11 @@ export function Sidebar() {
                         <Link
                           key={chapter.id}
                           href={chapterPath}
-                          className={`block px-3 py-1.5 text-sm rounded-lg transition-colors ${
+                          onClick={handleLinkClick}
+                          className={`block px-3 py-3 min-h-[44px] text-sm rounded-lg transition-colors ${
                             isActive
                               ? "bg-blue-50 text-blue-700 font-medium"
-                              : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                              : "text-gray-600 hover:bg-gray-50 active:bg-gray-100 hover:text-gray-900"
                           }`}
                         >
                           {chapter.id}. {chapter.title}

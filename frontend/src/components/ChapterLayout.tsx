@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { ArrowLeft, ArrowRight, Globe, Sparkles, Menu, X } from "lucide-react";
@@ -29,6 +29,56 @@ export function ChapterLayout({
   const [isUrdu, setIsUrdu] = useState(false);
   const [personalizedContent, setPersonalizedContent] = useState<string | null>(null);
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+
+  // Close sidebar handler
+  const closeSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+  }, []);
+
+  // Toggle sidebar handler
+  const toggleSidebar = useCallback(() => {
+    setIsSidebarOpen((prev) => !prev);
+  }, []);
+
+  // Lock body scroll when sidebar is open on mobile
+  useEffect(() => {
+    if (isSidebarOpen) {
+      // Prevent background scrolling on mobile
+      document.body.style.overflow = "hidden";
+      document.body.style.position = "fixed";
+      document.body.style.width = "100%";
+      document.body.style.top = `-${window.scrollY}px`;
+    } else {
+      // Restore scrolling
+      const scrollY = document.body.style.top;
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+      if (scrollY) {
+        window.scrollTo(0, parseInt(scrollY || "0") * -1);
+      }
+    }
+
+    return () => {
+      document.body.style.overflow = "";
+      document.body.style.position = "";
+      document.body.style.width = "";
+      document.body.style.top = "";
+    };
+  }, [isSidebarOpen]);
+
+  // ESC key handler
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isSidebarOpen) {
+        closeSidebar();
+      }
+    };
+
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isSidebarOpen, closeSidebar]);
 
   const handlePersonalize = async () => {
     setIsPersonalizing(true);
@@ -95,36 +145,57 @@ export function ChapterLayout({
     <div className="min-h-screen bg-gray-50">
       <Header />
 
-      {/* Mobile Sidebar Toggle */}
+      {/* Mobile Sidebar Toggle - 44px minimum touch target */}
       <button
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-        className="fixed top-20 left-4 z-30 lg:hidden bg-white p-2 rounded-lg shadow-md border border-gray-200"
+        onClick={toggleSidebar}
+        onTouchEnd={(e) => {
+          e.preventDefault();
+          toggleSidebar();
+        }}
+        className="fixed top-20 left-4 z-50 lg:hidden bg-white p-3 min-w-[44px] min-h-[44px] rounded-lg shadow-md border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors"
+        aria-label={isSidebarOpen ? "Close navigation menu" : "Open navigation menu"}
+        aria-expanded={isSidebarOpen}
+        aria-controls="mobile-sidebar"
       >
         {isSidebarOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
       </button>
 
-      {/* Sidebar */}
-      <div
-        className={`fixed inset-y-0 left-0 z-20 transform transition-transform duration-300 lg:translate-x-0 ${
-          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
-        }`}
-      >
-        <Sidebar />
-      </div>
-
-      {/* Overlay for mobile */}
+      {/* Overlay for mobile - handles both click and touch */}
       {isSidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/50 z-10 lg:hidden"
-          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden transition-opacity duration-300"
+          onClick={closeSidebar}
+          onTouchEnd={(e) => {
+            e.preventDefault();
+            closeSidebar();
+          }}
+          aria-hidden="true"
         />
       )}
+
+      {/* Mobile Sidebar Container */}
+      <div
+        id="mobile-sidebar"
+        className={`fixed inset-y-0 left-0 z-40 w-72 transform transition-transform duration-300 ease-in-out lg:translate-x-0 lg:z-20 ${
+          isSidebarOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+        role="dialog"
+        aria-modal={isSidebarOpen}
+        aria-label="Navigation menu"
+      >
+        <Sidebar onClose={closeSidebar} />
+      </div>
+
+      {/* Desktop Sidebar (always visible on lg+) */}
+      <div className="hidden lg:block fixed inset-y-0 left-0 z-20">
+        <Sidebar />
+      </div>
 
       {/* Main Content */}
       <main className="lg:ml-72 pt-16 min-h-screen">
         <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8">
           {/* Chapter Header */}
-          <div className="mb-8">
+          <div className="mb-8 pl-12 lg:pl-0">
             <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
               <Link href="/" className="hover:text-blue-600">
                 Home
@@ -142,7 +213,7 @@ export function ChapterLayout({
               <button
                 onClick={handlePersonalize}
                 disabled={isPersonalizing}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-3 min-h-[44px] bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-50"
               >
                 <Sparkles className="w-4 h-4" />
                 {isPersonalizing ? "Personalizing..." : "Personalize Content"}
@@ -151,10 +222,10 @@ export function ChapterLayout({
               <button
                 onClick={handleTranslate}
                 disabled={isTranslating}
-                className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors disabled:opacity-50 ${
+                className={`inline-flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 ${
                   isUrdu
-                    ? "bg-green-100 text-green-700 hover:bg-green-200"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-100"
+                    ? "bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-300"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200"
                 }`}
               >
                 <Globe className="w-4 h-4" />
@@ -183,7 +254,7 @@ export function ChapterLayout({
             {prevChapter ? (
               <Link
                 href={`/chapters/${prevChapter.slug}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-2 min-h-[44px]"
               >
                 <ArrowLeft className="w-5 h-5" />
                 <div className="text-left">
@@ -198,7 +269,7 @@ export function ChapterLayout({
             {nextChapter ? (
               <Link
                 href={`/chapters/${nextChapter.slug}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
+                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-2 min-h-[44px]"
               >
                 <div className="text-right">
                   <div className="text-xs text-gray-500">Next</div>
