@@ -15,8 +15,8 @@ from passlib.context import CryptContext
 
 router = APIRouter()
 
-# Password hashing
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Password hashing - using sha256_crypt (pure Python, no C dependencies)
+pwd_context = CryptContext(schemes=["sha256_crypt"], deprecated="auto")
 
 # JWT settings
 SECRET_KEY = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
