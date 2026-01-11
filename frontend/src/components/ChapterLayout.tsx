@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useState, useEffect, useCallback } from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
-import { ArrowLeft, ArrowRight, Globe, Sparkles, Menu, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Globe, Sparkles, Menu, X, ChevronRight } from "lucide-react";
 
 interface ChapterLayoutProps {
   children: React.ReactNode;
@@ -152,7 +152,7 @@ export function ChapterLayout({
           e.preventDefault();
           toggleSidebar();
         }}
-        className="fixed top-20 left-4 z-50 lg:hidden bg-white p-3 min-w-[44px] min-h-[44px] rounded-lg shadow-md border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors"
+        className="fixed top-20 left-4 z-30 lg:hidden bg-white p-3 min-w-[44px] min-h-[44px] rounded-xl shadow-md border border-gray-200 flex items-center justify-center active:bg-gray-100 transition-colors"
         aria-label={isSidebarOpen ? "Close navigation menu" : "Open navigation menu"}
         aria-expanded={isSidebarOpen}
         aria-controls="mobile-sidebar"
@@ -193,43 +193,58 @@ export function ChapterLayout({
 
       {/* Main Content */}
       <main className="lg:ml-72 pt-16 min-h-screen">
-        <div className="max-w-4xl mx-auto px-4 lg:px-8 py-8">
-          {/* Chapter Header */}
-          <div className="mb-8 pl-12 lg:pl-0">
-            <div className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-              <Link href="/" className="hover:text-blue-600">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          {/* Chapter Header - Beautiful styling */}
+          <div className="mb-8 ml-14 sm:ml-16 lg:ml-0">
+            {/* Breadcrumb */}
+            <nav className="flex items-center gap-1 text-sm text-gray-500 mb-4 flex-wrap">
+              <Link href="/" className="hover:text-blue-600 transition-colors">
                 Home
               </Link>
-              <span>/</span>
-              <span>Module {moduleId}</span>
-              <span>/</span>
-              <span className="text-gray-900">{chapterId}</span>
-            </div>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <span className="text-gray-600">Module {moduleId}</span>
+              <ChevronRight className="w-4 h-4 text-gray-400" />
+              <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-md text-xs font-medium">
+                {chapterId}
+              </span>
+            </nav>
 
-            <h1 className="text-3xl font-bold text-gray-900 mb-4">{title}</h1>
+            {/* Chapter Title - Gradient and beautiful */}
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900 mb-2 leading-tight">
+              <span className="bg-gradient-to-r from-blue-600 via-purple-600 to-blue-600 bg-clip-text text-transparent">
+                {title}
+              </span>
+            </h1>
+
+            {/* Decorative line */}
+            <div className="flex items-center gap-2 mb-6">
+              <div className="h-1 w-12 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full"></div>
+              <div className="h-1 w-4 bg-blue-200 rounded-full"></div>
+              <div className="h-1 w-2 bg-purple-200 rounded-full"></div>
+            </div>
 
             {/* Action Buttons */}
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handlePersonalize}
                 disabled={isPersonalizing}
-                className="inline-flex items-center gap-2 px-4 py-3 min-h-[44px] bg-purple-50 text-purple-700 rounded-lg hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-50 font-medium text-sm border border-purple-100"
               >
                 <Sparkles className="w-4 h-4" />
-                {isPersonalizing ? "Personalizing..." : "Personalize Content"}
+                {isPersonalizing ? "Personalizing..." : "Personalize"}
               </button>
 
               <button
                 onClick={handleTranslate}
                 disabled={isTranslating}
-                className={`inline-flex items-center gap-2 px-4 py-3 min-h-[44px] rounded-lg transition-colors disabled:opacity-50 ${
+                className={`inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl transition-colors disabled:opacity-50 font-medium text-sm border ${
                   isUrdu
-                    ? "bg-green-100 text-green-700 hover:bg-green-200 active:bg-green-300"
-                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200"
+                    ? "bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 border-green-100"
+                    : "bg-blue-50 text-blue-700 hover:bg-blue-100 active:bg-blue-200 border-blue-100"
                 }`}
               >
                 <Globe className="w-4 h-4" />
-                {isTranslating ? "Translating..." : isUrdu ? "Switch to English" : "Translate to Urdu"}
+                {isTranslating ? "Translating..." : isUrdu ? "English" : "Urdu"}
               </button>
             </div>
           </div>
@@ -237,7 +252,7 @@ export function ChapterLayout({
           {/* Content */}
           <article
             id="chapter-content"
-            className={`prose prose-lg max-w-none ${isUrdu ? "text-right" : ""}`}
+            className={`prose prose-lg max-w-none prose-headings:text-gray-900 prose-h2:text-xl prose-h2:sm:text-2xl prose-h2:font-bold prose-h2:mt-8 prose-h2:mb-4 prose-h3:text-lg prose-h3:font-semibold prose-p:text-gray-700 prose-li:text-gray-700 prose-strong:text-gray-900 prose-code:bg-gray-100 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm ${isUrdu ? "text-right" : ""}`}
             dir={isUrdu ? "rtl" : "ltr"}
           >
             {translatedContent ? (
@@ -250,16 +265,16 @@ export function ChapterLayout({
           </article>
 
           {/* Navigation */}
-          <nav className="mt-12 pt-8 border-t border-gray-200 flex justify-between">
+          <nav className="mt-12 pt-8 border-t border-gray-200 flex flex-col sm:flex-row justify-between gap-4">
             {prevChapter ? (
               <Link
                 href={`/chapters/${prevChapter.slug}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-2 min-h-[44px]"
+                className="flex items-center gap-3 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-3 px-4 min-h-[56px] rounded-xl hover:bg-gray-100 group"
               >
-                <ArrowLeft className="w-5 h-5" />
+                <ArrowLeft className="w-5 h-5 group-hover:-translate-x-1 transition-transform" />
                 <div className="text-left">
-                  <div className="text-xs text-gray-500">Previous</div>
-                  <div className="font-medium">{prevChapter.title}</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide">Previous</div>
+                  <div className="font-medium text-sm sm:text-base">{prevChapter.title}</div>
                 </div>
               </Link>
             ) : (
@@ -269,13 +284,13 @@ export function ChapterLayout({
             {nextChapter ? (
               <Link
                 href={`/chapters/${nextChapter.slug}`}
-                className="flex items-center gap-2 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-2 min-h-[44px]"
+                className="flex items-center gap-3 text-gray-600 hover:text-blue-600 active:text-blue-700 transition-colors py-3 px-4 min-h-[56px] rounded-xl hover:bg-gray-100 group sm:ml-auto"
               >
                 <div className="text-right">
-                  <div className="text-xs text-gray-500">Next</div>
-                  <div className="font-medium">{nextChapter.title}</div>
+                  <div className="text-xs text-gray-400 uppercase tracking-wide">Next</div>
+                  <div className="font-medium text-sm sm:text-base">{nextChapter.title}</div>
                 </div>
-                <ArrowRight className="w-5 h-5" />
+                <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
               </Link>
             ) : (
               <div />
