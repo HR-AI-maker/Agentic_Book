@@ -1,12 +1,45 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
-import { Menu, X, Github, User, LogIn } from "lucide-react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { Menu, X, Github, User, LogIn, LogOut } from "lucide-react";
+
+interface UserProfile {
+  id: string;
+  email: string;
+  name: string;
+  programming_experience: string;
+  hardware_experience: string;
+  primary_interest: string;
+}
 
 export function Header() {
+  const router = useRouter();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isLoggedIn] = useState(false); // TODO: Connect to auth
+  const [user, setUser] = useState<UserProfile | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // Check for user in localStorage on mount
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch {
+        localStorage.removeItem("user");
+        localStorage.removeItem("token");
+      }
+    }
+  }, []);
+
+  const handleLogout = () => {
+    localStorage.removeItem("user");
+    localStorage.removeItem("token");
+    setUser(null);
+    setIsDropdownOpen(false);
+    router.push("/");
+  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-40 bg-white border-b border-gray-200">
@@ -29,7 +62,7 @@ export function Header() {
             Start Learning
           </Link>
           <a
-            href="https://github.com"
+            href="https://github.com/HR-AI-maker/Agentic_Book"
             target="_blank"
             rel="noopener noreferrer"
             className="text-gray-600 hover:text-gray-900 transition-colors"
@@ -37,14 +70,41 @@ export function Header() {
             <Github className="w-5 h-5" />
           </a>
 
-          {isLoggedIn ? (
-            <Link
-              href="/profile"
-              className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
-            >
-              <User className="w-4 h-4" />
-              <span>Profile</span>
-            </Link>
+          {user ? (
+            <div className="relative">
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="flex items-center gap-2 px-4 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition-colors"
+              >
+                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                  <span className="text-white text-xs font-medium">
+                    {user.name.charAt(0).toUpperCase()}
+                  </span>
+                </div>
+                <span className="max-w-24 truncate">{user.name}</span>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1">
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-sm font-medium text-gray-900 truncate">{user.name}</p>
+                    <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                  </div>
+                  <div className="px-4 py-2 border-b border-gray-100">
+                    <p className="text-xs text-gray-500">Level: {user.programming_experience}</p>
+                    <p className="text-xs text-gray-500">Interest: {user.primary_interest}</p>
+                  </div>
+                  <button
+                    onClick={handleLogout}
+                    className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           ) : (
             <Link
               href="/login"
@@ -83,15 +143,42 @@ export function Header() {
             >
               Start Learning
             </Link>
-            <Link
-              href="/login"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-center"
-              onClick={() => setIsMobileMenuOpen(false)}
-            >
-              Sign In
-            </Link>
+            {user ? (
+              <>
+                <div className="px-4 py-2 border-t border-gray-100 mt-2">
+                  <p className="text-sm font-medium text-gray-900">{user.name}</p>
+                  <p className="text-xs text-gray-500">{user.email}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    handleLogout();
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className="px-4 py-2 text-red-600 hover:bg-red-50 rounded-lg text-left flex items-center gap-2"
+                >
+                  <LogOut className="w-4 h-4" />
+                  Sign Out
+                </button>
+              </>
+            ) : (
+              <Link
+                href="/login"
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg text-center"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+            )}
           </nav>
         </div>
+      )}
+
+      {/* Click outside to close dropdown */}
+      {isDropdownOpen && (
+        <div
+          className="fixed inset-0 z-[-1]"
+          onClick={() => setIsDropdownOpen(false)}
+        />
       )}
     </header>
   );
