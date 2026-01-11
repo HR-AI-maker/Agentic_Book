@@ -85,19 +85,19 @@ export function Header() {
   return (
     <header className="fixed top-0 left-0 right-0 z-50 bg-white border-b border-gray-200">
       <div className="flex items-center justify-between h-16 px-4 lg:px-6">
-        {/* Logo - Compact on mobile */}
+        {/* Logo */}
         <Link href="/" className="flex items-center gap-2 flex-shrink-0">
           <div className="w-9 h-9 bg-gradient-to-br from-blue-600 to-purple-600 rounded-lg flex items-center justify-center shadow-sm">
             <span className="text-white font-bold text-sm">PA</span>
           </div>
           <div className="hidden sm:block">
             <span className="font-bold text-lg text-gray-900">Physical AI</span>
-            <span className="font-medium text-lg text-gray-500 hidden md:inline"> & Humanoid Robotics</span>
+            <span className="font-medium text-lg text-gray-500 hidden lg:inline"> & Humanoid Robotics</span>
           </div>
         </Link>
 
-        {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-6">
+        {/* Desktop Navigation - Only show on large screens (1024px+) */}
+        <nav className="hidden lg:flex items-center gap-6">
           <Link href="/" className="text-gray-600 hover:text-gray-900 transition-colors py-2 font-medium">
             Home
           </Link>
@@ -162,14 +162,14 @@ export function Header() {
           )}
         </nav>
 
-        {/* Mobile Menu Button - 44px minimum touch target */}
+        {/* Mobile/Tablet Menu Button - Show on screens < 1024px */}
         <button
           onClick={toggleMobileMenu}
           onTouchEnd={(e) => {
             e.preventDefault();
             toggleMobileMenu();
           }}
-          className="md:hidden p-2.5 min-w-[44px] min-h-[44px] rounded-lg hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors"
+          className="lg:hidden p-2.5 min-w-[44px] min-h-[44px] rounded-lg hover:bg-gray-100 active:bg-gray-200 flex items-center justify-center transition-colors"
           aria-label={isMobileMenuOpen ? "Close menu" : "Open menu"}
           aria-expanded={isMobileMenuOpen}
           aria-controls="mobile-menu"
@@ -181,7 +181,7 @@ export function Header() {
       {/* Mobile Menu Overlay */}
       {isMobileMenuOpen && (
         <div
-          className="fixed inset-0 top-16 bg-black/50 z-40 md:hidden"
+          className="fixed inset-0 top-16 bg-black/50 z-40 lg:hidden"
           onClick={closeMobileMenu}
           onTouchEnd={(e) => {
             e.preventDefault();
@@ -191,10 +191,10 @@ export function Header() {
         />
       )}
 
-      {/* Mobile Menu */}
+      {/* Mobile Menu - Show on screens < 1024px */}
       <div
         id="mobile-menu"
-        className={`fixed left-0 right-0 top-16 bg-white border-b border-gray-200 shadow-lg z-50 md:hidden transform transition-transform duration-300 ease-in-out ${
+        className={`fixed left-0 right-0 top-16 bg-white border-b border-gray-200 shadow-lg z-50 lg:hidden transform transition-transform duration-300 ease-in-out ${
           isMobileMenuOpen ? "translate-y-0" : "-translate-y-full pointer-events-none"
         }`}
         role="dialog"
@@ -207,7 +207,7 @@ export function Header() {
             className="px-4 py-3.5 min-h-[48px] rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center gap-3 font-medium text-gray-700"
             onClick={closeMobileMenu}
           >
-            <Home className="w-5 h-5 text-gray-500" />
+            <Home className="w-5 h-5 text-blue-600" />
             Home
           </Link>
           <Link
@@ -215,7 +215,7 @@ export function Header() {
             className="px-4 py-3.5 min-h-[48px] rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center gap-3 font-medium text-gray-700"
             onClick={closeMobileMenu}
           >
-            <BookOpen className="w-5 h-5 text-gray-500" />
+            <BookOpen className="w-5 h-5 text-purple-600" />
             Start Learning
           </Link>
           <a
@@ -225,11 +225,11 @@ export function Header() {
             className="px-4 py-3.5 min-h-[48px] rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors flex items-center gap-3 font-medium text-gray-700"
             onClick={closeMobileMenu}
           >
-            <Github className="w-5 h-5 text-gray-500" />
+            <Github className="w-5 h-5 text-gray-700" />
             GitHub
           </a>
 
-          <div className="pt-2 mt-2 border-t border-gray-100">
+          <div className="pt-3 mt-3 border-t border-gray-200">
             {user ? (
               <>
                 <div className="px-4 py-3 bg-gray-50 rounded-xl mb-2">
@@ -259,7 +259,7 @@ export function Header() {
             ) : (
               <Link
                 href="/login"
-                className="px-4 py-3.5 min-h-[48px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl flex items-center justify-center gap-2 transition-all font-medium shadow-sm"
+                className="px-4 py-3.5 min-h-[48px] bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white rounded-xl flex items-center justify-center gap-2 transition-all font-medium shadow-sm mt-2"
                 onClick={closeMobileMenu}
               >
                 <LogIn className="w-5 h-5" />
