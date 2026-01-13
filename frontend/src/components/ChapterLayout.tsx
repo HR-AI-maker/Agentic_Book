@@ -29,6 +29,28 @@ export function ChapterLayout({
   const [isUrdu, setIsUrdu] = useState(false);
   const [personalizedContent, setPersonalizedContent] = useState<string | null>(null);
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
+  const [userLevel, setUserLevel] = useState<string>("intermediate");
+
+  // Get user level from localStorage
+  useEffect(() => {
+    const storedUser = localStorage.getItem("user");
+    if (storedUser) {
+      try {
+        const user = JSON.parse(storedUser);
+        // Map programming_experience to simpler levels
+        const experience = user.programming_experience?.toLowerCase() || "";
+        if (experience.includes("beginner") || experience.includes("none")) {
+          setUserLevel("beginner");
+        } else if (experience.includes("advanced") || experience.includes("expert")) {
+          setUserLevel("advanced");
+        } else {
+          setUserLevel("intermediate");
+        }
+      } catch {
+        // Keep default
+      }
+    }
+  }, []);
 
   // Close sidebar handler
   const closeSidebar = useCallback(() => {
@@ -91,7 +113,7 @@ export function ChapterLayout({
           body: JSON.stringify({
             content: document.getElementById("chapter-content")?.innerText || "",
             chapter_id: chapterId,
-            user_level: "intermediate", // TODO: Get from user profile
+            user_level: userLevel,
           }),
         }
       );
@@ -99,6 +121,8 @@ export function ChapterLayout({
       if (response.ok) {
         const data = await response.json();
         setPersonalizedContent(data.personalized_content);
+      } else {
+        console.error("Personalization failed:", response.status);
       }
     } catch (error) {
       console.error("Personalization error:", error);
@@ -133,6 +157,8 @@ export function ChapterLayout({
         const data = await response.json();
         setTranslatedContent(data.translated_content);
         setIsUrdu(true);
+      } else {
+        console.error("Translation failed:", response.status);
       }
     } catch (error) {
       console.error("Translation error:", error);

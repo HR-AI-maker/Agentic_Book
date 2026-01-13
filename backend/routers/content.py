@@ -30,14 +30,24 @@ def get_groq_client():
 
 
 class TranslateRequest(BaseModel):
-    text: str
+    content: str
+    chapter_id: Optional[str] = None
     target_language: str = "urdu"
 
 
 class TranslateResponse(BaseModel):
-    original_text: str
-    translated_text: str
+    translated_content: str
     target_language: str
+
+
+class PersonalizeRequest(BaseModel):
+    content: str
+    chapter_id: Optional[str] = None
+    user_level: str = "intermediate"
+
+
+class PersonalizeResponse(BaseModel):
+    personalized_content: str
 
 
 @router.post("/translate", response_model=TranslateResponse)
@@ -57,7 +67,7 @@ Translate the following content to Urdu while:
 
 Only return the translated text, nothing else."""
 
-        user_prompt = f"Translate this to Urdu:\n\n{request.text}"
+        user_prompt = f"Translate this to Urdu:\n\n{request.content}"
 
         response = get_groq_client().chat.completions.create(
             model="llama-3.3-70b-versatile",
@@ -66,15 +76,73 @@ Only return the translated text, nothing else."""
                 {"role": "user", "content": user_prompt}
             ],
             temperature=0.3,
-            max_tokens=2000
+            max_tokens=4000
         )
 
-        translated = response.choices[0].message.content
+        translated = response.choices[0].message.content or ""
 
         return TranslateResponse(
-            original_text=request.text,
-            translated_text=translated,
+            translated_content=translated,
             target_language=request.target_language
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/personalize", response_model=PersonalizeResponse)
+async def personalize_content(request: PersonalizeRequest):
+    """
+    Personalize content based on user's experience level.
+    Adjusts complexity, adds explanations, or provides advanced insights.
+    """
+    try:
+        level_instructions = {
+            "beginner": """Explain concepts in simpler terms.
+Add more context and background information.
+Use analogies to explain technical concepts.
+Break down complex ideas into smaller steps.
+Define technical terms when first used.""",
+            "intermediate": """Maintain the current level of technical detail.
+Add practical tips and common pitfalls to avoid.
+Include connections to related concepts.
+Provide context for why things work the way they do.""",
+            "advanced": """Add more technical depth and nuances.
+Include advanced use cases and optimizations.
+Reference underlying implementations.
+Discuss trade-offs and alternative approaches.
+Add links to further reading for deep dives."""
+        }
+
+        level_instruction = level_instructions.get(request.user_level, level_instructions["intermediate"])
+
+        system_prompt = f"""You are an expert educator specializing in robotics and AI.
+Personalize the following educational content for a {request.user_level} level learner.
+
+Guidelines:
+{level_instruction}
+
+Keep all code examples intact but add comments if helpful.
+Maintain the overall structure but adjust explanations.
+Keep technical terms but explain them appropriately for the level.
+
+Return the personalized content only, no meta-commentary."""
+
+        user_prompt = f"Personalize this content:\n\n{request.content}"
+
+        response = get_groq_client().chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.5,
+            max_tokens=4000
+        )
+
+        personalized = response.choices[0].message.content or ""
+
+        return PersonalizeResponse(
+            personalized_content=personalized
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
