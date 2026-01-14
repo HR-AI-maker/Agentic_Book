@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
-import { MessageCircle, X, Send, Loader2, Languages, Maximize2, Minimize2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { MessageCircle, X, Send, Loader2, Languages, Maximize2, Minimize2, LogIn } from "lucide-react";
 
 interface Message {
   id: string;
@@ -17,6 +18,7 @@ interface Message {
 }
 
 export function ChatWidget() {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -251,11 +253,6 @@ export function ChatWidget() {
     }
   };
 
-  // Don't render if user is not signed in
-  if (!isSignedIn) {
-    return null;
-  }
-
   return (
     <>
       {/* Chat Button */}
@@ -325,121 +322,148 @@ export function ChatWidget() {
             </div>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
-              >
-                <div
-                  className={`max-w-[80%] px-4 py-2 rounded-2xl ${
-                    message.role === "user"
-                      ? "bg-blue-600 text-white rounded-br-md"
-                      : "bg-gray-100 text-gray-800 rounded-bl-md"
-                  }`}
-                >
-                  {/* Message Content */}
-                  <p
-                    className={`text-sm whitespace-pre-wrap ${
-                      showUrdu[message.id] && message.translatedContent ? "text-right" : ""
-                    }`}
-                    dir={showUrdu[message.id] && message.translatedContent ? "rtl" : "ltr"}
-                  >
-                    {showUrdu[message.id] && message.translatedContent
-                      ? message.translatedContent
-                      : message.content}
-                  </p>
-
-                  {/* Translation Button for Assistant Messages */}
-                  {message.role === "assistant" && message.id !== "welcome" && (
-                    <div className="mt-2 pt-2 border-t border-gray-300">
-                      {message.isTranslating ? (
-                        <div className="flex items-center gap-1 text-xs text-gray-500">
-                          <Loader2 className="w-3 h-3 animate-spin" />
-                          <span>Translating to Urdu...</span>
-                        </div>
-                      ) : message.translatedContent ? (
-                        <button
-                          onClick={() => toggleLanguage(message.id)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <Languages className="w-3 h-3" />
-                          {showUrdu[message.id] ? "Show English" : "اردو میں دیکھیں"}
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => translateMessage(message.id, message.content)}
-                          className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
-                        >
-                          <Languages className="w-3 h-3" />
-                          Translate to Urdu
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Sources */}
-                  {message.sources && message.sources.length > 0 && !showUrdu[message.id] && (
-                    <div className="mt-2 pt-2 border-t border-gray-300">
-                      <p className="text-xs font-medium mb-1">Sources:</p>
-                      {message.sources.map((source, idx) => (
-                        <p key={idx} className="text-xs text-gray-600">
-                          Ch. {source.chapter}: {source.title}
-                        </p>
-                      ))}
-                    </div>
-                  )}
-                </div>
+          {/* Sign-in Prompt for non-authenticated users */}
+          {!isSignedIn ? (
+            <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+              <div className="bg-blue-50 rounded-full p-4 mb-4">
+                <LogIn className="w-8 h-8 text-blue-600" />
               </div>
-            ))}
-            {isLoading && (
-              <div className="flex justify-start">
-                <div className="bg-gray-100 px-4 py-2 rounded-2xl rounded-bl-md">
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-
-          {/* Selected Text Indicator in Chat */}
-          {selectedText && (
-            <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200">
-              <p className="text-xs text-yellow-800">
-                <span className="font-medium">Context: </span>
-                &quot;{selectedText.slice(0, 100)}...&quot;
-                <button
-                  onClick={() => setSelectedText("")}
-                  className="ml-2 text-yellow-600 hover:underline"
-                >
-                  Clear
-                </button>
+              <h4 className="text-lg font-semibold text-gray-800 mb-2">Sign in to Chat</h4>
+              <p className="text-sm text-gray-600 mb-4">
+                Please sign in to interact with the Physical AI Assistant and get answers to your questions.
               </p>
-            </div>
-          )}
-
-          {/* Input */}
-          <div className="p-4 border-t border-gray-200">
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
-                placeholder="Ask a question..."
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-                disabled={isLoading}
-              />
               <button
-                onClick={sendMessage}
-                disabled={isLoading || !input.trim()}
-                className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-2 rounded-full transition-colors"
+                onClick={() => router.push("/login")}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
               >
-                <Send className="w-5 h-5" />
+                Sign In
+              </button>
+              <button
+                onClick={() => router.push("/signup")}
+                className="mt-2 text-sm text-blue-600 hover:underline"
+              >
+                Don&apos;t have an account? Sign up
               </button>
             </div>
-          </div>
+          ) : (
+            <>
+              {/* Messages */}
+              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                {messages.map((message) => (
+                  <div
+                    key={message.id}
+                    className={`flex ${message.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] px-4 py-2 rounded-2xl ${
+                        message.role === "user"
+                          ? "bg-blue-600 text-white rounded-br-md"
+                          : "bg-gray-100 text-gray-800 rounded-bl-md"
+                      }`}
+                    >
+                      {/* Message Content */}
+                      <p
+                        className={`text-sm whitespace-pre-wrap ${
+                          showUrdu[message.id] && message.translatedContent ? "text-right" : ""
+                        }`}
+                        dir={showUrdu[message.id] && message.translatedContent ? "rtl" : "ltr"}
+                      >
+                        {showUrdu[message.id] && message.translatedContent
+                          ? message.translatedContent
+                          : message.content}
+                      </p>
+
+                      {/* Translation Button for Assistant Messages */}
+                      {message.role === "assistant" && message.id !== "welcome" && (
+                        <div className="mt-2 pt-2 border-t border-gray-300">
+                          {message.isTranslating ? (
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <Loader2 className="w-3 h-3 animate-spin" />
+                              <span>Translating to Urdu...</span>
+                            </div>
+                          ) : message.translatedContent ? (
+                            <button
+                              onClick={() => toggleLanguage(message.id)}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                            >
+                              <Languages className="w-3 h-3" />
+                              {showUrdu[message.id] ? "Show English" : "اردو میں دیکھیں"}
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => translateMessage(message.id, message.content)}
+                              className="flex items-center gap-1 text-xs text-blue-600 hover:underline"
+                            >
+                              <Languages className="w-3 h-3" />
+                              Translate to Urdu
+                            </button>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Sources */}
+                      {message.sources && message.sources.length > 0 && !showUrdu[message.id] && (
+                        <div className="mt-2 pt-2 border-t border-gray-300">
+                          <p className="text-xs font-medium mb-1">Sources:</p>
+                          {message.sources.map((source, idx) => (
+                            <p key={idx} className="text-xs text-gray-600">
+                              Ch. {source.chapter}: {source.title}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {isLoading && (
+                  <div className="flex justify-start">
+                    <div className="bg-gray-100 px-4 py-2 rounded-2xl rounded-bl-md">
+                      <Loader2 className="w-5 h-5 animate-spin text-blue-600" />
+                    </div>
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              {/* Selected Text Indicator in Chat */}
+              {selectedText && (
+                <div className="px-4 py-2 bg-yellow-50 border-t border-yellow-200">
+                  <p className="text-xs text-yellow-800">
+                    <span className="font-medium">Context: </span>
+                    &quot;{selectedText.slice(0, 100)}...&quot;
+                    <button
+                      onClick={() => setSelectedText("")}
+                      className="ml-2 text-yellow-600 hover:underline"
+                    >
+                      Clear
+                    </button>
+                  </p>
+                </div>
+              )}
+
+              {/* Input */}
+              <div className="p-4 border-t border-gray-200">
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                    placeholder="Ask a question..."
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                    disabled={isLoading}
+                  />
+                  <button
+                    onClick={sendMessage}
+                    disabled={isLoading || !input.trim()}
+                    className="bg-blue-600 hover:bg-blue-700 disabled:bg-gray-400 text-white p-2 rounded-full transition-colors"
+                  >
+                    <Send className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </>
