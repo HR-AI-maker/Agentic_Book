@@ -63,7 +63,7 @@ export function ChatWidget() {
       const response = await fetch(`${apiUrl}/api/content/translate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ content: text }),
       });
 
       if (!response.ok) throw new Error("Translation failed");
@@ -74,7 +74,7 @@ export function ChatWidget() {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === messageId
-            ? { ...msg, translatedContent: data.translated_text, isTranslating: false }
+            ? { ...msg, translatedContent: data.translated_content, isTranslating: false }
             : msg
         )
       );
