@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { MessageCircle, X, Send, Loader2, Languages } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { MessageCircle, X, Send, Loader2, Languages, Maximize2, Minimize2 } from "lucide-react";
 
 interface Message {
   id: string;
@@ -18,6 +18,7 @@ interface Message {
 
 export function ChatWidget() {
   const [isOpen, setIsOpen] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
     {
       id: "welcome",
@@ -30,7 +31,110 @@ export function ChatWidget() {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedText, setSelectedText] = useState("");
   const [showUrdu, setShowUrdu] = useState<Record<string, boolean>>({});
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [chatSize, setChatSize] = useState({ width: 384, height: 500 }); // Default: w-96 (384px), h-500px
+  const [isResizing, setIsResizing] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
+  const resizeStartRef = useRef({ x: 0, y: 0, width: 0, height: 0 });
+
+  // Detect mobile device
+  useEffect(() => {
+    const checkMobile = () => {
+      setIsMobile(window.innerWidth < 768);
+      if (window.innerWidth < 768) {
+        setChatSize({ width: window.innerWidth - 48, height: window.innerHeight * 0.6 });
+      }
+    };
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Handle resize start
+  const handleResizeStart = useCallback((e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+    const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    resizeStartRef.current = {
+      x: clientX,
+      y: clientY,
+      width: chatSize.width,
+      height: chatSize.height,
+    };
+  }, [chatSize]);
+
+  // Handle resize move
+  useEffect(() => {
+    const handleResizeMove = (e: MouseEvent | TouchEvent) => {
+      if (!isResizing) return;
+      const clientX = "touches" in e ? e.touches[0].clientX : e.clientX;
+      const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+
+      const deltaX = resizeStartRef.current.x - clientX;
+      const deltaY = resizeStartRef.current.y - clientY;
+
+      const newWidth = Math.max(300, Math.min(800, resizeStartRef.current.width + deltaX));
+      const newHeight = Math.max(400, Math.min(window.innerHeight - 100, resizeStartRef.current.height + deltaY));
+
+      setChatSize({ width: newWidth, height: newHeight });
+    };
+
+    const handleResizeEnd = () => {
+      setIsResizing(false);
+    };
+
+    if (isResizing) {
+      window.addEventListener("mousemove", handleResizeMove);
+      window.addEventListener("mouseup", handleResizeEnd);
+      window.addEventListener("touchmove", handleResizeMove);
+      window.addEventListener("touchend", handleResizeEnd);
+    }
+
+    return () => {
+      window.removeEventListener("mousemove", handleResizeMove);
+      window.removeEventListener("mouseup", handleResizeEnd);
+      window.removeEventListener("touchmove", handleResizeMove);
+      window.removeEventListener("touchend", handleResizeEnd);
+    };
+  }, [isResizing]);
+
+  // Toggle expanded mode
+  const toggleExpanded = useCallback(() => {
+    if (isExpanded) {
+      setChatSize(isMobile
+        ? { width: window.innerWidth - 48, height: window.innerHeight * 0.6 }
+        : { width: 384, height: 500 }
+      );
+    } else {
+      setChatSize(isMobile
+        ? { width: window.innerWidth - 24, height: window.innerHeight - 100 }
+        : { width: 600, height: 700 }
+      );
+    }
+    setIsExpanded(!isExpanded);
+  }, [isExpanded, isMobile]);
+
+  // Check if user is signed in
+  useEffect(() => {
+    const checkAuth = () => {
+      const user = localStorage.getItem("user");
+      setIsSignedIn(!!user);
+    };
+
+    checkAuth();
+    // Listen for storage changes (login/logout in other tabs)
+    window.addEventListener("storage", checkAuth);
+    // Also check periodically for same-tab changes
+    const interval = setInterval(checkAuth, 1000);
+
+    return () => {
+      window.removeEventListener("storage", checkAuth);
+      clearInterval(interval);
+    };
+  }, []);
 
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -147,6 +251,11 @@ export function ChatWidget() {
     }
   };
 
+  // Don't render if user is not signed in
+  if (!isSignedIn) {
+    return null;
+  }
+
   return (
     <>
       {/* Chat Button */}
@@ -174,16 +283,45 @@ export function ChatWidget() {
 
       {/* Chat Panel */}
       {isOpen && (
-        <div className="fixed bottom-24 right-6 z-50 w-96 h-[500px] bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200">
+        <div
+          ref={chatRef}
+          className="fixed bottom-24 right-6 z-50 bg-white rounded-2xl shadow-2xl flex flex-col border border-gray-200 transition-all duration-200"
+          style={{
+            width: isMobile ? `calc(100vw - 48px)` : `${chatSize.width}px`,
+            height: `${chatSize.height}px`,
+            maxWidth: "calc(100vw - 48px)",
+            maxHeight: "calc(100vh - 120px)",
+          }}
+        >
+          {/* Resize Handle - Top Left Corner */}
+          {!isMobile && (
+            <div
+              className="absolute -top-1 -left-1 w-4 h-4 cursor-nw-resize z-10 group"
+              onMouseDown={handleResizeStart}
+              onTouchStart={handleResizeStart}
+            >
+              <div className="w-3 h-3 border-t-2 border-l-2 border-gray-400 group-hover:border-blue-500 rounded-tl" />
+            </div>
+          )}
+
           {/* Header */}
           <div className="bg-blue-600 text-white px-4 py-3 rounded-t-2xl flex justify-between items-center">
             <div>
-              <h3 className="font-semibold">Physical AI Assistant</h3>
-              <p className="text-xs text-blue-100">Ask questions about the textbook</p>
+              <h3 className="font-semibold text-sm md:text-base">Physical AI Assistant</h3>
+              <p className="text-xs text-blue-100 hidden sm:block">Ask questions about the textbook</p>
             </div>
-            <div className="flex items-center gap-1 bg-blue-500 px-2 py-1 rounded-lg">
-              <Languages className="w-4 h-4" />
-              <span className="text-xs">اردو</span>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={toggleExpanded}
+                className="p-1 hover:bg-blue-500 rounded transition-colors"
+                aria-label={isExpanded ? "Minimize chat" : "Maximize chat"}
+              >
+                {isExpanded ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+              </button>
+              <div className="flex items-center gap-1 bg-blue-500 px-2 py-1 rounded-lg">
+                <Languages className="w-4 h-4" />
+                <span className="text-xs">اردو</span>
+              </div>
             </div>
           </div>
 
