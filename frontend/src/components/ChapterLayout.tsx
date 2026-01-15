@@ -341,11 +341,22 @@ export function ChapterLayout({
 
             {/* Error Message */}
             {error && (
-              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
-                {error}
+              <div className="mt-3 p-4 bg-amber-50 border border-amber-200 rounded-lg text-amber-900 text-sm">
+                <div className="font-semibold mb-2">⚠️ API Quota Limit Reached</div>
+                <p className="mb-3">
+                  The free tier API keys have reached their usage limits. To continue using the Personalize and Urdu translation features, you'll need to provide your own API keys:
+                </p>
+                <ul className="list-disc list-inside mb-3 space-y-1">
+                  <li><strong>Groq API Key:</strong> Get free tier at <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">console.groq.com/keys</a></li>
+                  <li><strong>Gemini API Key:</strong> Get free tier at <a href="https://ai.google.dev" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ai.google.dev</a></li>
+                  <li><strong>OpenAI API Key:</strong> Available at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">platform.openai.com/api-keys</a></li>
+                </ul>
+                <p className="text-xs text-amber-800 mb-3">
+                  Update the keys in your backend <code className="bg-amber-100 px-1 rounded">.env</code> file and restart the server.
+                </p>
                 <button
                   onClick={() => setError(null)}
-                  className="ml-2 text-red-500 hover:text-red-700 font-medium"
+                  className="px-3 py-1 bg-amber-200 hover:bg-amber-300 text-amber-900 rounded font-medium transition-colors"
                 >
                   Dismiss
                 </button>
