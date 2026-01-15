@@ -15,6 +15,7 @@ class ChatRequest(BaseModel):
     question: str
     context: Optional[str] = None
     user_id: Optional[str] = None
+    language: str = "english"  # Support for "english", "urdu", etc.
 
 
 class Source(BaseModel):
@@ -40,12 +41,14 @@ async def chat(request: ChatRequest):
     """
     Ask a question to the RAG chatbot.
     Optionally provide context (selected text) for more focused answers.
+    Supports multiple languages: english, urdu
     """
     try:
         result = await rag_service.get_answer(
             question=request.question,
             context=request.context,
-            user_id=request.user_id
+            user_id=request.user_id,
+            language=request.language
         )
         return result
     except Exception as e:

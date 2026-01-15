@@ -123,10 +123,12 @@ class RAGService:
         self,
         question: str,
         context: Optional[str] = None,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        language: str = "english"
     ) -> Dict:
         """
         Get answer using Groq LLM with textbook content as context.
+        Supports multiple languages: english, urdu
         """
         # Search for relevant chapters
         relevant_chunks = self.search_relevant_chapters(question)
@@ -144,12 +146,17 @@ class RAGService:
                 for ch in self.chapters[:5]
             ])
 
-        system_prompt = """You are a helpful teaching assistant for the Physical AI & Humanoid Robotics textbook.
+        # Build language instruction
+        language_instruction = ""
+        if language.lower() == "urdu":
+            language_instruction = "\nIMPORTANT: Respond in Urdu language. Keep technical terms in English."
+
+        system_prompt = f"""You are a helpful teaching assistant for the Physical AI & Humanoid Robotics textbook.
 Answer questions based on the provided context from the textbook.
 If the context contains relevant information, use it to provide accurate, educational answers.
 Always cite which chapter your information comes from when applicable.
 Keep your answers clear, concise, and helpful for students learning robotics.
-If the question is not related to the textbook content, politely redirect to robotics topics."""
+If the question is not related to the textbook content, politely redirect to robotics topics.{language_instruction}"""
 
         user_prompt = f"""Context from textbook:
 {context_text}
