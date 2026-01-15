@@ -14,8 +14,9 @@ router = APIRouter()
 # Import textbook content
 from data.textbook_content import CHAPTERS
 
-# Lazy initialization for Groq client
+# Lazy initialization for LLM clients
 _groq_client = None
+_openai_client = None
 
 def get_groq_client():
     global _groq_client
@@ -29,13 +30,22 @@ def get_groq_client():
         )
     return _groq_client
 
+def get_openai_client():
+    global _openai_client
+    if _openai_client is None:
+        api_key = os.getenv("OPENAI_API_KEY")
+        if not api_key:
+            raise ValueError("OPENAI_API_KEY environment variable is required")
+        _openai_client = OpenAI(api_key=api_key)
+    return _openai_client
+
 def call_gemini(prompt: str, max_tokens: int = 4000) -> str:
     """Call Gemini API directly via REST as fallback."""
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
         raise ValueError("GEMINI_API_KEY not configured")
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
 
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -46,21 +56,66 @@ def call_gemini(prompt: str, max_tokens: int = 4000) -> str:
     }
 
     # Retry up to 2 times on timeout
+    last_error = None
     for attempt in range(2):
         try:
             response = httpx.post(url, json=payload, timeout=120.0)
             response.raise_for_status()
             data = response.json()
-            return data["candidates"][0]["content"]["parts"][0]["text"]
+
+            # Check if response has the expected structure
+            if "candidates" in data and len(data["candidates"]) > 0:
+                if "content" in data["candidates"][0] and "parts" in data["candidates"][0]["content"]:
+                    if len(data["candidates"][0]["content"]["parts"]) > 0:
+                        return data["candidates"][0]["content"]["parts"][0]["text"]
+
+            print(f"Unexpected Gemini response structure: {data}")
+            raise Exception("Invalid response format from Gemini API")
+
         except httpx.TimeoutException:
+            last_error = Exception("Gemini request timed out.")
             if attempt == 1:
-                raise Exception("Request timed out.")
+                print(f"Gemini timeout after 2 attempts")
+                raise last_error
             print(f"Gemini timeout, retrying... (attempt {attempt + 1})")
+
         except Exception as e:
-            raise e
+            last_error = e
+            error_str = str(e)
+            print(f"Gemini API error (attempt {attempt + 1}): {error_str}")
+
+            # If it's not a timeout, don't retry
+            if not isinstance(e, httpx.TimeoutException):
+                raise e
+
+    # Fallback if loop exits without returning
+    if last_error:
+        raise last_error
+    raise Exception("Unknown error in Gemini API call")
+
+def call_openai(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
+    """Call OpenAI API as third fallback."""
+    try:
+        print(f"Falling back to OpenAI API")
+        response = get_openai_client().chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=max_tokens
+        )
+        result = response.choices[0].message.content or ""
+        print(f"OpenAI API success")
+        return result
+    except Exception as e:
+        error_str = str(e)
+        print(f"OpenAI API error: {error_str}")
+        raise Exception(f"OpenAI error: {error_str}")
 
 def call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
-    """Call LLM with automatic fallback from Groq to Gemini on rate limit."""
+    """Call LLM with automatic fallback: Groq → Gemini → OpenAI."""
     full_prompt = f"{system_prompt}\n\n{user_prompt}"
 
     # Try Groq first
@@ -80,9 +135,24 @@ def call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> st
         # Check if it's a rate limit error (429)
         if "429" in error_str or "rate_limit" in error_str.lower():
             print(f"Groq rate limit hit, falling back to Gemini")
-            # Fall back to Gemini
-            return call_gemini(full_prompt, max_tokens)
+            try:
+                # Fall back to Gemini
+                return call_gemini(full_prompt, max_tokens)
+            except Exception as gemini_error:
+                gemini_error_str = str(gemini_error)
+                print(f"Gemini fallback failed: {gemini_error_str}")
+
+                # If Gemini is also rate limited, try OpenAI
+                if "429" in gemini_error_str or "rate_limit" in gemini_error_str.lower():
+                    try:
+                        return call_openai(system_prompt, user_prompt, max_tokens)
+                    except Exception as openai_error:
+                        print(f"OpenAI fallback failed: {str(openai_error)}")
+                        raise Exception(f"All LLM services failed: Groq and Gemini rate limited, OpenAI error: {str(openai_error)}")
+                else:
+                    raise Exception(f"Groq rate limited, Gemini error: {gemini_error_str}")
         else:
+            print(f"Groq error: {error_str}")
             raise e
 
 
