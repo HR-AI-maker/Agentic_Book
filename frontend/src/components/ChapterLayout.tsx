@@ -31,6 +31,7 @@ export function ChapterLayout({
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState<string>("intermediate");
   const [error, setError] = useState<string | null>(null);
+  const [showNotification, setShowNotification] = useState(false);
   const originalContentRef = useRef<string>("");
 
   // Capture original content once on mount
@@ -151,11 +152,14 @@ export function ChapterLayout({
         setPersonalizedContent(data.personalized_content);
         setTranslatedContent(null); // Clear translation when personalizing
       } else {
-        // Silently fail - user will see buttons remain in normal state
-        // No error message displayed to keep UI clean
+        // Show simple notification to use API key
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
       }
     } catch (err) {
-      // Silently fail - keep UI clean during network errors
+      // Show notification on network error
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
     } finally {
       setIsPersonalizing(false);
     }
@@ -203,11 +207,14 @@ export function ChapterLayout({
         setTranslatedContent(data.translated_content);
         setIsUrdu(true);
       } else {
-        // Silently fail - user will see buttons remain in normal state
-        // No error message displayed to keep UI clean
+        // Show simple notification to use API key
+        setShowNotification(true);
+        setTimeout(() => setShowNotification(false), 3000);
       }
     } catch (err) {
-      // Silently fail - keep UI clean during network errors
+      // Show notification on network error
+      setShowNotification(true);
+      setTimeout(() => setShowNotification(false), 3000);
     } finally {
       setIsTranslating(false);
     }
@@ -348,6 +355,15 @@ export function ChapterLayout({
               </div>
             )}
           </div>
+
+          {/* Notification Toast */}
+          {showNotification && (
+            <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-fade-in">
+              <div className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg text-sm font-medium">
+                Use your API key to continue
+              </div>
+            </div>
+          )}
 
           {/* Content */}
           <article
