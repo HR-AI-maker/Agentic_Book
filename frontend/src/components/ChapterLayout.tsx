@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Header } from "./Header";
 import { Sidebar } from "./Sidebar";
 import { ArrowLeft, ArrowRight, Globe, Sparkles, Menu, X, ChevronRight } from "lucide-react";
@@ -30,6 +30,19 @@ export function ChapterLayout({
   const [personalizedContent, setPersonalizedContent] = useState<string | null>(null);
   const [translatedContent, setTranslatedContent] = useState<string | null>(null);
   const [userLevel, setUserLevel] = useState<string>("intermediate");
+  const [error, setError] = useState<string | null>(null);
+  const originalContentRef = useRef<string>("");
+
+  // Capture original content once on mount
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const contentElement = document.getElementById("chapter-content");
+      if (contentElement && !originalContentRef.current) {
+        originalContentRef.current = contentElement.innerText || "";
+      }
+    }, 100); // Small delay to ensure content is rendered
+    return () => clearTimeout(timer);
+  }, []);
 
   // Get user level from localStorage
   useEffect(() => {
@@ -104,14 +117,29 @@ export function ChapterLayout({
 
   const handlePersonalize = async () => {
     setIsPersonalizing(true);
+    setError(null);
     try {
+      // Use original content if available, otherwise get current content
+      let content = originalContentRef.current;
+      if (!content) {
+        const contentElement = document.getElementById("chapter-content");
+        content = contentElement?.innerText || "";
+      }
+
+      if (!content || content.trim().length < 50) {
+        setError("Unable to get chapter content. Please refresh the page and try again.");
+        setIsPersonalizing(false);
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/content/personalize`,
+        `${apiUrl}/api/content/personalize`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content: document.getElementById("chapter-content")?.innerText || "",
+            content: content,
             chapter_id: chapterId,
             user_level: userLevel,
           }),
@@ -121,11 +149,15 @@ export function ChapterLayout({
       if (response.ok) {
         const data = await response.json();
         setPersonalizedContent(data.personalized_content);
+        setTranslatedContent(null); // Clear translation when personalizing
       } else {
-        console.error("Personalization failed:", response.status);
+        const errorText = await response.text();
+        console.error("Personalization failed:", response.status, errorText);
+        setError(`Personalization failed (${response.status}). Please try again.`);
       }
-    } catch (error) {
-      console.error("Personalization error:", error);
+    } catch (err) {
+      console.error("Personalization error:", err);
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setIsPersonalizing(false);
     }
@@ -139,14 +171,29 @@ export function ChapterLayout({
     }
 
     setIsTranslating(true);
+    setError(null);
     try {
+      // Use personalized content if available, otherwise original content
+      let content = personalizedContent || originalContentRef.current;
+      if (!content) {
+        const contentElement = document.getElementById("chapter-content");
+        content = contentElement?.innerText || "";
+      }
+
+      if (!content || content.trim().length < 50) {
+        setError("Unable to get chapter content. Please refresh the page and try again.");
+        setIsTranslating(false);
+        return;
+      }
+
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000"}/api/content/translate`,
+        `${apiUrl}/api/content/translate`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            content: document.getElementById("chapter-content")?.innerText || "",
+            content: content,
             chapter_id: chapterId,
             target_language: "urdu",
           }),
@@ -158,10 +205,13 @@ export function ChapterLayout({
         setTranslatedContent(data.translated_content);
         setIsUrdu(true);
       } else {
-        console.error("Translation failed:", response.status);
+        const errorText = await response.text();
+        console.error("Translation failed:", response.status, errorText);
+        setError(`Translation failed (${response.status}). Please try again.`);
       }
-    } catch (error) {
-      console.error("Translation error:", error);
+    } catch (err) {
+      console.error("Translation error:", err);
+      setError("Network error. Please check your connection and try again.");
     } finally {
       setIsTranslating(false);
     }
@@ -253,7 +303,7 @@ export function ChapterLayout({
             <div className="flex flex-wrap gap-3">
               <button
                 onClick={handlePersonalize}
-                disabled={isPersonalizing}
+                disabled={isPersonalizing || isTranslating}
                 className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 active:bg-purple-200 transition-colors disabled:opacity-50 font-medium text-sm border border-purple-100"
               >
                 <Sparkles className="w-4 h-4" />
@@ -262,7 +312,7 @@ export function ChapterLayout({
 
               <button
                 onClick={handleTranslate}
-                disabled={isTranslating}
+                disabled={isTranslating || isPersonalizing}
                 className={`inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] rounded-xl transition-colors disabled:opacity-50 font-medium text-sm border ${
                   isUrdu
                     ? "bg-green-50 text-green-700 hover:bg-green-100 active:bg-green-200 border-green-100"
@@ -272,7 +322,35 @@ export function ChapterLayout({
                 <Globe className="w-4 h-4" />
                 {isTranslating ? "Translating..." : isUrdu ? "English" : "Urdu"}
               </button>
+
+              {/* Reset button - only show when content has been modified */}
+              {(personalizedContent || translatedContent) && (
+                <button
+                  onClick={() => {
+                    setPersonalizedContent(null);
+                    setTranslatedContent(null);
+                    setIsUrdu(false);
+                    setError(null);
+                  }}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 min-h-[44px] bg-gray-50 text-gray-700 rounded-xl hover:bg-gray-100 active:bg-gray-200 transition-colors font-medium text-sm border border-gray-200"
+                >
+                  Reset
+                </button>
+              )}
             </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+                {error}
+                <button
+                  onClick={() => setError(null)}
+                  className="ml-2 text-red-500 hover:text-red-700 font-medium"
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Content */}

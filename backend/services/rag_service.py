@@ -5,6 +5,7 @@ No vector database needed - uses keyword matching for context retrieval
 
 import os
 import uuid
+import httpx
 from typing import Optional, List, Dict
 from openai import OpenAI
 from data.textbook_content import CHAPTERS
@@ -28,6 +29,61 @@ class RAGService:
                 base_url="https://api.groq.com/openai/v1"
             )
         return self._groq_client
+
+    def call_gemini(self, prompt: str, max_tokens: int = 1000) -> str:
+        """Call Gemini API as fallback when Groq hits rate limits."""
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            raise ValueError("GEMINI_API_KEY not configured")
+
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+        payload = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": max_tokens,
+                "temperature": 0.3
+            }
+        }
+
+        # Retry up to 2 times on timeout
+        for attempt in range(2):
+            try:
+                response = httpx.post(url, json=payload, timeout=120.0)
+                response.raise_for_status()
+                data = response.json()
+                return data["candidates"][0]["content"]["parts"][0]["text"]
+            except httpx.TimeoutException:
+                if attempt == 1:
+                    raise Exception("Request timed out.")
+                print(f"Gemini timeout in RAG, retrying... (attempt {attempt + 1})")
+            except Exception as e:
+                raise e
+
+    def call_llm(self, system_prompt: str, user_prompt: str, max_tokens: int = 1000) -> str:
+        """Call LLM with automatic fallback from Groq to Gemini on rate limit."""
+        full_prompt = f"{system_prompt}\n\n{user_prompt}"
+
+        # Try Groq first
+        try:
+            response = self.groq_client.chat.completions.create(
+                model=self.chat_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,
+                max_tokens=max_tokens
+            )
+            return response.choices[0].message.content or ""
+        except Exception as e:
+            error_str = str(e)
+            # Check if it's a rate limit error (429)
+            if "429" in error_str or "rate_limit" in error_str.lower():
+                print(f"Groq rate limit hit in RAG, falling back to Gemini")
+                return self.call_gemini(full_prompt, max_tokens)
+            else:
+                raise e
 
     def search_relevant_chapters(self, query: str, limit: int = 3) -> List[Dict]:
         """
@@ -105,17 +161,7 @@ User question: {question}
 Please provide a helpful, accurate answer based on the textbook content."""
 
         try:
-            response = self.groq_client.chat.completions.create(
-                model=self.chat_model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_prompt}
-                ],
-                temperature=0.3,
-                max_tokens=1000
-            )
-
-            answer = response.choices[0].message.content
+            answer = self.call_llm(system_prompt, user_prompt, max_tokens=1000)
         except Exception as e:
             answer = f"I apologize, but I encountered an error: {str(e)}. Please make sure the API is configured correctly."
 

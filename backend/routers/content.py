@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 import os
+import httpx
 from openai import OpenAI
 
 router = APIRouter()
@@ -27,6 +28,62 @@ def get_groq_client():
             base_url="https://api.groq.com/openai/v1"
         )
     return _groq_client
+
+def call_gemini(prompt: str, max_tokens: int = 4000) -> str:
+    """Call Gemini API directly via REST as fallback."""
+    api_key = os.getenv("GEMINI_API_KEY")
+    if not api_key:
+        raise ValueError("GEMINI_API_KEY not configured")
+
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={api_key}"
+
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
+            "maxOutputTokens": max_tokens,
+            "temperature": 0.3
+        }
+    }
+
+    # Retry up to 2 times on timeout
+    for attempt in range(2):
+        try:
+            response = httpx.post(url, json=payload, timeout=120.0)
+            response.raise_for_status()
+            data = response.json()
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except httpx.TimeoutException:
+            if attempt == 1:
+                raise Exception("Request timed out.")
+            print(f"Gemini timeout, retrying... (attempt {attempt + 1})")
+        except Exception as e:
+            raise e
+
+def call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 4000) -> str:
+    """Call LLM with automatic fallback from Groq to Gemini on rate limit."""
+    full_prompt = f"{system_prompt}\n\n{user_prompt}"
+
+    # Try Groq first
+    try:
+        response = get_groq_client().chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=0.3,
+            max_tokens=max_tokens
+        )
+        return response.choices[0].message.content or ""
+    except Exception as e:
+        error_str = str(e)
+        # Check if it's a rate limit error (429)
+        if "429" in error_str or "rate_limit" in error_str.lower():
+            print(f"Groq rate limit hit, falling back to Gemini")
+            # Fall back to Gemini
+            return call_gemini(full_prompt, max_tokens)
+        else:
+            raise e
 
 
 class TranslateRequest(BaseModel):
@@ -69,17 +126,7 @@ Only return the translated text, nothing else."""
 
         user_prompt = f"Translate this to Urdu:\n\n{request.content}"
 
-        response = get_groq_client().chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.3,
-            max_tokens=4000
-        )
-
-        translated = response.choices[0].message.content or ""
+        translated = call_llm(system_prompt, user_prompt, max_tokens=4000)
 
         return TranslateResponse(
             translated_content=translated,
@@ -129,17 +176,7 @@ Return the personalized content only, no meta-commentary."""
 
         user_prompt = f"Personalize this content:\n\n{request.content}"
 
-        response = get_groq_client().chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt}
-            ],
-            temperature=0.5,
-            max_tokens=4000
-        )
-
-        personalized = response.choices[0].message.content or ""
+        personalized = call_llm(system_prompt, user_prompt, max_tokens=4000)
 
         return PersonalizeResponse(
             personalized_content=personalized
