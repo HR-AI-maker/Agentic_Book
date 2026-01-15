@@ -151,13 +151,11 @@ export function ChapterLayout({
         setPersonalizedContent(data.personalized_content);
         setTranslatedContent(null); // Clear translation when personalizing
       } else {
-        const errorText = await response.text();
-        console.error("Personalization failed:", response.status, errorText);
-        setError(`Personalization failed (${response.status}). Please try again.`);
+        // Silently fail - user will see buttons remain in normal state
+        // No error message displayed to keep UI clean
       }
     } catch (err) {
-      console.error("Personalization error:", err);
-      setError("Network error. Please check your connection and try again.");
+      // Silently fail - keep UI clean during network errors
     } finally {
       setIsPersonalizing(false);
     }
@@ -205,13 +203,11 @@ export function ChapterLayout({
         setTranslatedContent(data.translated_content);
         setIsUrdu(true);
       } else {
-        const errorText = await response.text();
-        console.error("Translation failed:", response.status, errorText);
-        setError(`Translation failed (${response.status}). Please try again.`);
+        // Silently fail - user will see buttons remain in normal state
+        // No error message displayed to keep UI clean
       }
     } catch (err) {
-      console.error("Translation error:", err);
-      setError("Network error. Please check your connection and try again.");
+      // Silently fail - keep UI clean during network errors
     } finally {
       setIsTranslating(false);
     }
